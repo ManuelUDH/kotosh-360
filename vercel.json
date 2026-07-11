@@ -1,0 +1,10 @@
+{
+  "buildCommand": "cd src-dashboard && npm install && npm run build",
+  "outputDirectory": "src-dashboard/build",
+  "env": {
+    "PUBLIC_URL": "/"
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
