@@ -1,6 +1,10 @@
 {
   "buildCommand": "cd src-dashboard && npm install && npm run build",
   "outputDirectory": "src-dashboard/build",
+  "env": {
+    "CI": "false",
+    "GENERATE_SOURCEMAP": "false"
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
