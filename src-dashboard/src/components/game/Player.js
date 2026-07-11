@@ -2,10 +2,12 @@ import React, { useRef, useState, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { PointerLockControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { mobileInput } from './mobileStore';
+import { mobileInput, audioStore, GUIDES } from './mobileStore';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function Player() {
   const { camera } = useThree();
+  const { t } = useLanguage();
   const [moveForward, setMoveForward] = useState(false);
   const [moveBackward, setMoveBackward] = useState(false);
   const [moveLeft, setMoveLeft] = useState(false);
@@ -15,6 +17,24 @@ export default function Player() {
   const direction = useRef(new THREE.Vector3());
   const yVelocity = useRef(0);
   const isJumping = useRef(false);
+  // Track which guide is currently near (by index, -1 = none)
+  const nearGuideRef = useRef(-1);
+  // Resolved guide texts — updated whenever language changes
+  const guideTextsRef = useRef(null);
+
+  // Keep guide texts in sync with current language
+  useEffect(() => {
+    guideTextsRef.current = GUIDES.map(g => ({
+      text:  t(g.textKey),
+      title: t(g.titleKey),
+      lang:  t('voiceLang'),
+    }));
+    // If a guide is currently active, update its text too
+    if (nearGuideRef.current >= 0 && guideTextsRef.current) {
+      const gt = guideTextsRef.current[nearGuideRef.current];
+      audioStore.setGuide(gt.text, gt.title, gt.lang);
+    }
+  }); // no dep array — runs every render so it picks up language changes
 
   useEffect(() => {
     // Spawn at grass level in front of the staircase
@@ -68,7 +88,7 @@ export default function Player() {
     
     if (mobileInput.isMobile) {
       moveX = mobileInput.moveX;
-      moveZ = -mobileInput.moveZ; // mobileInput.moveZ is positive downwards, but we want negative to go backward, wait: joystick up = negative dy => moveZ > 0. Actually: -dy is forward.
+      moveZ = -mobileInput.moveZ;
       
       // Camera Look
       const lookSensitivity = 0.005;
@@ -225,6 +245,33 @@ export default function Player() {
       // Smooth lerp — slightly faster up than down so steps feel snappy
       const lerpSpeed = camera.position.y < targetY ? 14 : 5;
       camera.position.y += (targetY - camera.position.y) * lerpSpeed * delta;
+    }
+
+    // ── GUIDE PROXIMITY DETECTION (runs every frame, triggers mobile audio button) ──
+    if (guideTextsRef.current) {
+      let foundIdx = -1;
+      const px = camera.position.x;
+      const py = camera.position.y;
+      const pz = camera.position.z;
+      for (let i = 0; i < GUIDES.length; i++) {
+        const g = GUIDES[i];
+        const dx = px - g.worldPos[0];
+        const dy = py - g.worldPos[1];
+        const dz = pz - g.worldPos[2];
+        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        if (dist < g.radius) { foundIdx = i; break; }
+      }
+
+      if (foundIdx !== nearGuideRef.current) {
+        nearGuideRef.current = foundIdx;
+        if (foundIdx >= 0) {
+          const g = GUIDES[foundIdx];
+          const gt = guideTextsRef.current;
+          audioStore.setGuide(gt[foundIdx].text, gt[foundIdx].title, gt[foundIdx].lang);
+        } else if (!audioStore.speaking) {
+          audioStore.clearGuide();
+        }
+      }
     }
   });
 
