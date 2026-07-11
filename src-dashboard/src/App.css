@@ -1,0 +1,13 @@
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+.app-content {
+  flex: 1;
+  padding: 32px;
+  overflow-y: auto;
+}
+.app-content.no-sidebar {
+  padding: 0;
+  overflow: hidden; /* For full screen canvas */
+}
