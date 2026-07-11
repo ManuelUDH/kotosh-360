@@ -4,7 +4,7 @@ import { useTexture, Html } from '@react-three/drei';
 import CrossedHands from './CrossedHands';
 import DustParticles from './DustParticles';
 import { useLanguage } from '../../context/LanguageContext';
-import { audioStore } from './mobileStore';
+
 
 // ─── WALL COMPONENT ───────────────────────────────────────────────────────────
 function AdobeWall({ width, height, depth = 1.0, position, rotation, color = '#8a7860', plastered = false, texture = null }) {
@@ -223,63 +223,30 @@ function Guide({ position, titleKey, textKey }) {
   const speakingStatus = t('speakingStatus');
   const listenStatus = t('listenStatus');
 
-  // Sync speaking state from audioStore (driven by the HTML button on mobile)
-  React.useEffect(() => {
-    const unsub = audioStore.subscribe((state) => {
-      // Only update if this guide is the active one
-      if (audioStore.activeText === text) {
-        setSpeaking(state.speaking);
-      } else if (speaking) {
-        setSpeaking(false);
-      }
-    });
-    return unsub;
-  }, [text]); // text is stable per guide instance
-
-
   const handleClick = (e) => {
     e.stopPropagation();
-    // On desktop: direct SpeechSynthesis (works fine)
-    // On mobile: also update audioStore so the HTML button reflects state
     if (speaking) {
       window.speechSynthesis.cancel();
       setSpeaking(false);
-      audioStore.setSpeaking(false);
       return;
     }
     window.speechSynthesis.cancel();
-    // Update store so the floating HTML button knows which guide is active
-    audioStore.setGuide(text, title, voiceLang);
-    // Try direct speech (works on desktop, may be blocked on mobile)
     const utter = new SpeechSynthesisUtterance(text);
     utter.lang  = voiceLang;
     utter.rate  = 0.92;
     utter.pitch = 1.0;
-    utter.onstart = () => { setSpeaking(true);  audioStore.setSpeaking(true); };
-    utter.onend   = () => { setSpeaking(false); audioStore.setSpeaking(false); };
-    utter.onerror = () => { setSpeaking(false); audioStore.setSpeaking(false); };
+    utter.onstart = () => { setSpeaking(true); };
+    utter.onend   = () => { setSpeaking(false); };
+    utter.onerror = () => { setSpeaking(false); };
     window.speechSynthesis.speak(utter);
   };
 
   return (
     <group position={position}
       onClick={handleClick}
-      onPointerOver={(e) => {
-        e.stopPropagation();
-        setHovered(true);
-        document.body.style.cursor = 'pointer';
-        // On mobile, register this guide as the active one when the player is near
-        audioStore.setGuide(text, title, voiceLang);
-      }}
-      onPointerOut={(e)  => {
-        e.stopPropagation();
-        setHovered(false);
-        document.body.style.cursor = 'auto';
-        // Only clear if not speaking
-        if (!audioStore.speaking) audioStore.clearGuide();
-      }}
+      onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = 'pointer'; }}
+      onPointerOut={(e)  => { e.stopPropagation(); setHovered(false); document.body.style.cursor = 'auto'; }}
     >
-      {/* Billboard sprite — always faces the camera, transparent PNG */}
       <sprite position={[0, 0.9, 0]} scale={[1.8, 1.8, 1.8]}>
         <spriteMaterial
           map={guideTex}
@@ -291,13 +258,11 @@ function Guide({ position, titleKey, textKey }) {
         />
       </sprite>
 
-      {/* Invisible click target at body centre */}
       <mesh position={[0, 0.9, 0]} visible={false}>
         <boxGeometry args={[1.0, 1.8, 0.3]} />
         <meshBasicMaterial />
       </mesh>
 
-      {/* Speech bubble */}
       <Html position={[0, 2.15, 0]} center transform sprite style={{ pointerEvents: 'none' }}>
         <div style={{
           background: speaking ? 'rgba(30,150,30,0.93)' : 'rgba(10,10,10,0.8)',

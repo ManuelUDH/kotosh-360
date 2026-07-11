@@ -7,7 +7,7 @@ import { useLanguage } from '../context/LanguageContext';
 import Player from '../components/game/Player';
 import TempleScene from '../components/game/TempleScene';
 import MobileJoystick from '../components/game/MobileJoystick';
-import { audioStore } from '../components/game/mobileStore';
+import { audioStore, GUIDES } from '../components/game/mobileStore';
 import './ExploreView.css';
 
 export default function ExploreView() {
@@ -26,6 +26,16 @@ export default function ExploreView() {
       setUsername(user);
     }
   }, [navigate]);
+
+  // Populate GUIDES resolved texts whenever language changes
+  // (Player reads these in useFrame to activate the audio button)
+  useEffect(() => {
+    GUIDES.forEach(g => {
+      g.resolvedText  = t(g.textKey);
+      g.resolvedTitle = t(g.titleKey);
+      g.resolvedLang  = t('voiceLang');
+    });
+  }, [t]);
 
   // Subscribe to audioStore changes
   useEffect(() => {

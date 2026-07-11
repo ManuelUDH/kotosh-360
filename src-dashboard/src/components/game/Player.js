@@ -3,11 +3,10 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { PointerLockControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { mobileInput, audioStore, GUIDES } from './mobileStore';
-import { useLanguage } from '../../context/LanguageContext';
+
 
 export default function Player() {
   const { camera } = useThree();
-  const { t } = useLanguage();
   const [moveForward, setMoveForward] = useState(false);
   const [moveBackward, setMoveBackward] = useState(false);
   const [moveLeft, setMoveLeft] = useState(false);
@@ -19,22 +18,6 @@ export default function Player() {
   const isJumping = useRef(false);
   // Track which guide is currently near (by index, -1 = none)
   const nearGuideRef = useRef(-1);
-  // Resolved guide texts — updated whenever language changes
-  const guideTextsRef = useRef(null);
-
-  // Keep guide texts in sync with current language
-  useEffect(() => {
-    guideTextsRef.current = GUIDES.map(g => ({
-      text:  t(g.textKey),
-      title: t(g.titleKey),
-      lang:  t('voiceLang'),
-    }));
-    // If a guide is currently active, update its text too
-    if (nearGuideRef.current >= 0 && guideTextsRef.current) {
-      const gt = guideTextsRef.current[nearGuideRef.current];
-      audioStore.setGuide(gt.text, gt.title, gt.lang);
-    }
-  }); // no dep array — runs every render so it picks up language changes
 
   useEffect(() => {
     // Spawn at grass level in front of the staircase
@@ -248,7 +231,7 @@ export default function Player() {
     }
 
     // ── GUIDE PROXIMITY DETECTION (runs every frame, triggers mobile audio button) ──
-    if (guideTextsRef.current) {
+    {
       let foundIdx = -1;
       const px = camera.position.x;
       const py = camera.position.y;
@@ -258,7 +241,7 @@ export default function Player() {
         const dx = px - g.worldPos[0];
         const dy = py - g.worldPos[1];
         const dz = pz - g.worldPos[2];
-        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
         if (dist < g.radius) { foundIdx = i; break; }
       }
 
@@ -266,8 +249,12 @@ export default function Player() {
         nearGuideRef.current = foundIdx;
         if (foundIdx >= 0) {
           const g = GUIDES[foundIdx];
-          const gt = guideTextsRef.current;
-          audioStore.setGuide(gt[foundIdx].text, gt[foundIdx].title, gt[foundIdx].lang);
+          // resolvedText/resolvedTitle/resolvedLang are set by ExploreView when language loads
+          audioStore.setGuide(
+            g.resolvedText  || g.textKey,
+            g.resolvedTitle || g.titleKey,
+            g.resolvedLang  || 'es-PE'
+          );
         } else if (!audioStore.speaking) {
           audioStore.clearGuide();
         }
