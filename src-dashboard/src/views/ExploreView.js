@@ -7,11 +7,14 @@ import { useLanguage } from '../context/LanguageContext';
 import Player from '../components/game/Player';
 import TempleScene from '../components/game/TempleScene';
 import MobileJoystick from '../components/game/MobileJoystick';
+import { audioStore } from '../components/game/mobileStore';
 import './ExploreView.css';
 
 export default function ExploreView() {
   const [username, setUsername] = useState('');
   const [locked, setLocked] = useState(false);
+  // ── Mobile audio button state (synced with audioStore) ──
+  const [guideAudio, setGuideAudio] = useState({ activeText: null, activeTitle: null, voiceLang: 'es-PE', speaking: false });
   const navigate = useNavigate();
   const { t } = useLanguage();
 
@@ -23,6 +26,14 @@ export default function ExploreView() {
       setUsername(user);
     }
   }, [navigate]);
+
+  // Subscribe to audioStore changes
+  useEffect(() => {
+    const unsub = audioStore.subscribe((state) => {
+      setGuideAudio({ ...state });
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     const handleLock = () => setLocked(true);
@@ -36,10 +47,44 @@ export default function ExploreView() {
     };
   }, []);
 
+  // Mobile audio button handler — called from a real DOM button (works on iOS/Android)
+  const handleMobileAudio = () => {
+    if (guideAudio.speaking) {
+      window.speechSynthesis.cancel();
+      audioStore.setSpeaking(false);
+      return;
+    }
+    if (!guideAudio.activeText) return;
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(guideAudio.activeText);
+    utter.lang  = guideAudio.voiceLang || 'es-PE';
+    utter.rate  = 0.92;
+    utter.pitch = 1.0;
+    utter.onstart = () => audioStore.setSpeaking(true);
+    utter.onend   = () => audioStore.setSpeaking(false);
+    utter.onerror = () => audioStore.setSpeaking(false);
+    window.speechSynthesis.speak(utter);
+  };
+
   return (
     <div className="explore-container">
       <MobileJoystick />
-      
+
+      {/* ── MOBILE AUDIO BUTTON (HTML overlay, always accessible from DOM) ── */}
+      {guideAudio.activeText && (
+        <button
+          id="mobile-audio-btn"
+          className={`mobile-audio-btn ${guideAudio.speaking ? 'speaking' : ''}`}
+          onClick={handleMobileAudio}
+          aria-label={guideAudio.speaking ? 'Detener audio' : 'Escuchar guía'}
+        >
+          <span className="mobile-audio-icon">{guideAudio.speaking ? '⏹' : '🔊'}</span>
+          <span className="mobile-audio-label">
+            {guideAudio.speaking ? 'Detener' : guideAudio.activeTitle || 'Escuchar'}
+          </span>
+        </button>
+      )}
+
       {/* HUD overlay */}
       <div className="hud" style={{ pointerEvents: 'none' }}>
         <div className="hud-header">
